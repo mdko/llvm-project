@@ -318,3 +318,59 @@ class StdStringDataFormatterTestCase(TestBase):
     def test_embedded_null_msvc(self):
         self.build()
         self.do_test_embedded_null()
+
+    def do_test_max_string_summary_length_invalidation(self):
+        """Test that changing target.max-string-summary-length invalidates
+        the summary cache so subsequent lookups reflect the new limit."""
+        (_, _, thread, _) = lldbutil.run_to_source_breakpoint(
+            self, "Set break point at this line.", self.main_spec
+        )
+
+        # Restore the default after the test.
+        self.addTearDownHook(
+            lambda: self.runCmd(
+                "settings set target.max-string-summary-length 1024", check=False
+            )
+        )
+
+        TheVeryLongOne = thread.frames[0].FindVariable("TheVeryLongOne")
+
+        # With the default max-string-summary-length (1024), the summary
+        # should be truncated and should NOT contain "someText" (which
+        # appears well past offset 2400).
+        summary = TheVeryLongOne.GetSummary()
+        self.assertIsNotNone(summary)
+        self.assertNotIn(
+            "someText",
+            summary,
+            "Default summary should be truncated before 'someText'",
+        )
+
+        # Increase the limit so the full string is shown.
+        self.runCmd("settings set target.max-string-summary-length 4096")
+
+        # The cached summary should be invalidated and re-fetched with
+        # the new limit, now including "someText".
+        summary = TheVeryLongOne.GetSummary()
+        self.assertIsNotNone(summary)
+        self.assertIn(
+            "someText",
+            summary,
+            "After increasing max-string-summary-length, summary should "
+            "include 'someText'",
+        )
+
+    @add_test_categories(["libc++"])
+    def test_max_string_summary_length_invalidation_libcxx(self):
+        self.build(dictionary={"USE_LIBCPP": 1})
+        self.do_test_max_string_summary_length_invalidation()
+
+    @add_test_categories(["libstdcxx"])
+    def test_max_string_summary_length_invalidation_libstdcxx(self):
+        self.build(dictionary={"USE_LIBSTDCPP": 1})
+        self.do_test_max_string_summary_length_invalidation()
+
+    @add_test_categories(["msvcstl"])
+    def test_max_string_summary_length_invalidation_msvc(self):
+        self.build()
+        self.do_test_max_string_summary_length_invalidation()

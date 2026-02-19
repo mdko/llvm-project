@@ -959,6 +959,9 @@ protected:
   std::string m_location_str;
   /// Cached summary string that will get cleared if/when the value is updated.
   std::string m_summary_str;
+  /// The value of target.max-string-summary-length when m_summary_str was last
+  /// computed. Used to invalidate the cache when the setting changes.
+  uint32_t m_max_string_summary_length_at_cache = 0;
   /// Cached result of the "object printer". This differs from the summary
   /// in that the summary is consed up by us, the object_desc_string is builtin.
   std::string m_object_desc_str;

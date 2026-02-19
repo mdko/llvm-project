@@ -637,11 +637,20 @@ bool ValueObject::GetSummaryAsCString(TypeSummaryImpl *summary_ptr,
 }
 
 const char *ValueObject::GetSummaryAsCString(lldb::LanguageType lang) {
-  if (UpdateValueIfNeeded(true) && m_summary_str.empty()) {
-    TypeSummaryOptions summary_options;
-    summary_options.SetLanguage(lang);
-    GetSummaryAsCString(GetSummaryFormat().get(), m_summary_str,
-                        summary_options);
+  if (UpdateValueIfNeeded(true)) {
+    uint32_t max_len = 0;
+    if (auto target_sp = GetTargetSP())
+      max_len = target_sp->GetMaximumSizeOfStringSummary();
+
+    if (m_summary_str.empty() ||
+        max_len != m_max_string_summary_length_at_cache) {
+      m_summary_str.clear();
+      TypeSummaryOptions summary_options;
+      summary_options.SetLanguage(lang);
+      GetSummaryAsCString(GetSummaryFormat().get(), m_summary_str,
+                          summary_options);
+      m_max_string_summary_length_at_cache = max_len;
+    }
   }
   if (m_summary_str.empty())
     return nullptr;
@@ -3501,8 +3510,10 @@ void ValueObject::ClearUserVisibleData(uint32_t clear_mask) {
     m_location_str.clear();
 
   if ((clear_mask & eClearUserVisibleDataItemsSummary) ==
-      eClearUserVisibleDataItemsSummary)
+      eClearUserVisibleDataItemsSummary) {
     m_summary_str.clear();
+    m_max_string_summary_length_at_cache = 0;
+  }
 
   if ((clear_mask & eClearUserVisibleDataItemsDescription) ==
       eClearUserVisibleDataItemsDescription)
